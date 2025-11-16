@@ -166,8 +166,14 @@ The default configuration uses Ollama, so no API key is needed if you're running
 **Make sure your virtual environment is activated** (you should see `(venv)` in your terminal):
 
 ```bash
-# Classify files in a directory
+# Classify files in a directory (uses config.yaml language setting, default: English)
 python -m src.main classify /path/to/messy/files /path/to/organized/files
+
+# Use Indonesian for directory names (override config)
+python -m src.main classify /path/to/files /path/to/organized --language id
+
+# Use English for directory names (override config)
+python -m src.main classify /path/to/files /path/to/organized --language en
 
 # Preview changes without moving files (dry run)
 python -m src.main classify /path/to/files /path/to/organized --dry-run
@@ -178,6 +184,20 @@ python -m src.main classify /path/to/files /path/to/organized --config config/co
 # Verbose output
 python -m src.main classify /path/to/files /path/to/organized --verbose
 ```
+
+#### Language Options
+
+You can specify the language using either short codes or full names:
+
+| Short Code | Full Name | Example |
+|------------|-----------|---------|
+| `id` | `indonesian` | `--language id` |
+| `en` | `english` | `--language en` |
+| `es` | `spanish` | `--language es` |
+| `fr` | `french` | `--language fr` |
+| `de` | `german` | `--language de` |
+| `ja` | `japanese` | `--language ja` |
+| `zh` | `chinese` | `--language zh` |
 
 ## Configuration
 
@@ -220,19 +240,34 @@ scanning:
 
 ## Usage Examples
 
-### Example 1: Organize Downloads Folder
+### Example 1: Organize Downloads Folder with Indonesian Names
 
 ```bash
-python -m src.main classify ~/Downloads ~/Downloads/Organized --dry-run
+# Preview with Indonesian directory names
+python -m src.main classify ~/Downloads ~/Downloads/Organized --language id --dry-run
+
+# Results: dokumen/, gambar/, musik/, video/, etc.
 ```
 
-### Example 2: Classify Code Projects
+### Example 2: Classify Code Projects with English Names
 
 ```bash
-python -m src.main classify ~/Projects ~/Projects/Organized
+# Organize with English directory names
+python -m src.main classify ~/Projects ~/Projects/Organized --language en
+
+# Results: documents/, images/, music/, videos/, etc.
 ```
 
-### Example 3: Using Ollama (Local LLM)
+### Example 3: Using Spanish for Personal Files
+
+```bash
+# Use Spanish directory names
+python -m src.main classify ~/Documents ~/Documents/Organized --language es
+
+# Results: documentos/, fotos_personales/, etc.
+```
+
+### Example 4: Using Ollama (Local LLM)
 
 1. Install and start Ollama:
 ```bash
@@ -248,9 +283,13 @@ api:
   model_name: "gemma3:latest"
 ```
 
-3. Run classifier:
+3. Run classifier with language preference:
 ```bash
-python -m src.main classify /path/to/files /path/to/organized
+# Indonesian directories with local LLM
+python -m src.main classify /path/to/files /path/to/organized --language id
+
+# English directories with local LLM
+python -m src.main classify /path/to/files /path/to/organized --language en
 ```
 
 ## Directory Structure After Classification
@@ -294,12 +333,12 @@ directories:
 
 ## Multi-Language Directory Naming
 
-The AI File Classifier supports generating directory names in multiple languages, with **Indonesian (Bahasa Indonesia)** as the default primary language.
+The AI File Classifier supports generating directory names in multiple languages. **English is the default**, but you can easily switch to Indonesian, Spanish, French, or other supported languages using the `--language` CLI argument.
 
 ### Supported Languages
 
-- **Indonesian** (Bahasa Indonesia) - Primary language
-- English
+- **English** (Default)
+- **Indonesian** (Bahasa Indonesia)
 - Spanish (Español)
 - French (Français)
 - German (Deutsch)
@@ -307,6 +346,34 @@ The AI File Classifier supports generating directory names in multiple languages
 - Chinese (中文)
 
 ### Configuration
+
+There are two ways to set the language:
+
+#### Option 1: Command-Line Argument (Recommended)
+
+Use the `--language` or `-l` flag when running the classifier:
+
+```bash
+# Indonesian
+python -m src.main classify ./files ./organized --language id
+
+# English (default if no config and no argument)
+python -m src.main classify ./files ./organized --language en
+
+# Spanish
+python -m src.main classify ./files ./organized --language es
+```
+
+**Supported language codes:**
+- `id` or `indonesian` - Bahasa Indonesia
+- `en` or `english` - English (default)
+- `es` or `spanish` - Español
+- `fr` or `french` - Français
+- `de` or `german` - Deutsch
+- `ja` or `japanese` - 日本語
+- `zh` or `chinese` - 中文
+
+#### Option 2: Configuration File
 
 Add the language configuration to your `config/config.yaml`:
 
@@ -321,6 +388,8 @@ language:
     - "spanish"
     - "french"
 ```
+
+**Note:** The `--language` CLI argument will override the config file setting.
 
 ### Examples
 
