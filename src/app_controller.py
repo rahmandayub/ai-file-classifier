@@ -50,12 +50,15 @@ class ApplicationController:
         api_config = self.config['api']
         self.llm_client = LLMClient(api_config)
 
-        # AI classifier
+        # AI classifier with language support
+        language_config = self.config.get('language', {})
         self.ai_classifier = AIClassifier(
             llm_client=self.llm_client,
             cache_manager=self.cache_manager,
             max_retries=api_config.get('max_retries', 3),
-            retry_delay=api_config.get('retry_delay', 2)
+            retry_delay=api_config.get('retry_delay', 2),
+            language=language_config.get('primary', 'english'),
+            fallback_language=language_config.get('fallback', 'english')
         )
 
         # Classification strategy

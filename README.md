@@ -5,6 +5,7 @@ A Python-based intelligent application that automatically analyzes, classifies, 
 ## Features
 
 - **AI-Powered Classification**: Uses LLMs to intelligently understand file content and context
+- **Multi-Language Directory Naming**: Generate directory names in Indonesian, English, Spanish, French, and more
 - **Multiple AI Provider Support**: Works with OpenAI, Ollama, LocalAI, and other OpenAI-compatible APIs
 - **Flexible Organization**: Content-based, project-based, date-based, and type-based classification strategies
 - **Dry-Run Mode**: Preview changes before executing
@@ -290,6 +291,142 @@ Configure in `config.yaml`:
 directories:
   naming_convention: "snake_case"
 ```
+
+## Multi-Language Directory Naming
+
+The AI File Classifier supports generating directory names in multiple languages, with **Indonesian (Bahasa Indonesia)** as the default primary language.
+
+### Supported Languages
+
+- **Indonesian** (Bahasa Indonesia) - Primary language
+- English
+- Spanish (Español)
+- French (Français)
+- German (Deutsch)
+- Japanese (日本語)
+- Chinese (中文)
+
+### Configuration
+
+Add the language configuration to your `config/config.yaml`:
+
+```yaml
+# Language Settings
+language:
+  primary: "indonesian"      # Primary language for directory names
+  fallback: "english"        # Fallback if primary not available
+  supported_languages:
+    - "indonesian"
+    - "english"
+    - "spanish"
+    - "french"
+```
+
+### Examples
+
+#### Indonesian Directory Names (Default)
+
+When configured with Indonesian as the primary language, the classifier will generate directory names like:
+
+```
+organized/
+├── dokumen/
+│   ├── laporan_keuangan/
+│   ├── faktur/
+│   └── kontrak/
+├── kode_program/
+│   ├── proyek_python/
+│   └── skrip/
+├── media/
+│   ├── foto_pribadi/
+│   ├── video/
+│   └── musik/
+└── data/
+    ├── lembar_kerja/
+    └── arsip/
+```
+
+**Common Indonesian → English Translations:**
+
+| Indonesian | English | snake_case Output |
+|------------|---------|-------------------|
+| Dokumen | Documents | `dokumen/` |
+| Laporan Keuangan | Financial Reports | `laporan_keuangan/` |
+| Foto Pribadi | Personal Photos | `foto_pribadi/` |
+| Proyek Pekerjaan | Work Projects | `proyek_pekerjaan/` |
+| Musik | Music | `musik/` |
+| Video | Videos | `video/` |
+| Arsip | Archives | `arsip/` |
+| Unduhan | Downloads | `unduhan/` |
+| Gambar | Images | `gambar/` |
+| Lembar Kerja | Spreadsheets | `lembar_kerja/` |
+| Kode Program | Code | `kode_program/` |
+| Kontrak | Contracts | `kontrak/` |
+| Faktur | Invoices | `faktur/` |
+| Dokumen Pajak | Tax Documents | `dokumen_pajak/` |
+
+#### English Directory Names
+
+```yaml
+language:
+  primary: "english"
+```
+
+```
+organized/
+├── documents/
+│   ├── financial_reports/
+│   ├── invoices/
+│   └── contracts/
+├── code/
+│   ├── python_projects/
+│   └── scripts/
+└── media/
+    ├── personal_photos/
+    ├── videos/
+    └── music/
+```
+
+### Testing Language Configuration
+
+Run the included example to see how different languages affect directory naming:
+
+```bash
+python examples/indonesian_example.py
+```
+
+This will display:
+- System prompts for Indonesian and English configurations
+- Example directory name mappings
+- Configuration instructions
+
+### How It Works
+
+1. **AI Analysis**: The LLM analyzes file content in any language
+2. **Category Generation**: Based on the configured language, it generates appropriate category names
+3. **Naming Convention**: The naming convention (snake_case, kebab-case, etc.) is applied to the generated names
+4. **Directory Creation**: Directories are created with the localized names
+
+**Example Flow:**
+
+```
+File: budget_2024.xlsx
+    ↓
+AI Analysis (understands content in any language)
+    ↓
+Category Generation (in Indonesian): "Dokumen Keuangan" → "Anggaran"
+    ↓
+Apply Naming Convention: "dokumen_keuangan/anggaran/"
+    ↓
+Final Path: organized/dokumen_keuangan/anggaran/budget_2024.xlsx
+```
+
+### Benefits of Multi-Language Support
+
+- **Localization**: Organize files in your native language
+- **Clarity**: Directory names that make sense to local users
+- **Flexibility**: Switch languages easily via configuration
+- **AI-Powered**: Intelligent translation and categorization
 
 ## Reports
 
