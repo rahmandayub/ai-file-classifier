@@ -1,5 +1,6 @@
 """Application controller orchestrating the classification workflow."""
 
+import asyncio
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -196,7 +197,35 @@ class ApplicationController:
         files: List[FileInfo]
     ) -> Dict[FileInfo, Optional[Classification]]:
         """
-        Classify all files.
+        Classify all files using optimized batch processing.
+
+        Args:
+            files: List of file information objects
+
+        Returns:
+            Dictionary mapping files to classifications
+        """
+        # Get batch processing configuration
+        perf_config = self.config.get('performance', {})
+        batch_config = perf_config.get('batch_processing', {})
+
+        use_batch = batch_config.get('enabled', True)
+        batch_size = batch_config.get('batch_size', perf_config.get('batch_size', 50))
+        max_concurrent = self.config['api'].get('max_concurrent_requests', 5)
+
+        if use_batch and len(files) > 1:
+            logger.info(f"Using batch processing (batch_size={batch_size}, max_concurrent={max_concurrent})")
+            return self._classify_files_batch(files, batch_size, max_concurrent)
+        else:
+            logger.info("Using serial processing")
+            return self._classify_files_serial(files)
+
+    def _classify_files_serial(
+        self,
+        files: List[FileInfo]
+    ) -> Dict[FileInfo, Optional[Classification]]:
+        """
+        Classify files serially (legacy mode).
 
         Args:
             files: List of file information objects
@@ -217,6 +246,144 @@ class ApplicationController:
 
         classified = sum(1 for c in classification_map.values() if c is not None)
         logger.info(f"Successfully classified {classified}/{len(files)} files")
+
+        return classification_map
+
+    def _classify_files_batch(
+        self,
+        files: List[FileInfo],
+        batch_size: int,
+        max_concurrent: int
+    ) -> Dict[FileInfo, Optional[Classification]]:
+        """
+        Classify files using concurrent batch processing.
+
+        Args:
+            files: List of file information objects
+            batch_size: Maximum files per batch
+            max_concurrent: Maximum concurrent API requests
+
+        Returns:
+            Dictionary mapping files to classifications
+        """
+        # Run async batch processing in event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            classification_map = loop.run_until_complete(
+                self._classify_files_batch_async(files, batch_size, max_concurrent)
+            )
+            return classification_map
+        finally:
+            loop.close()
+
+    def _group_files_intelligently(
+        self,
+        files: List[FileInfo],
+        strategy: str = 'extension'
+    ) -> List[FileInfo]:
+        """
+        Group and sort files intelligently for better batch processing.
+
+        Args:
+            files: List of file information objects
+            strategy: Grouping strategy ('extension', 'size', 'mixed')
+
+        Returns:
+            Reordered list of files
+        """
+        if strategy == 'extension':
+            # Group by extension for better classification context
+            return sorted(files, key=lambda f: (f.extension, f.size))
+        elif strategy == 'size':
+            # Group by size categories for memory management
+            return sorted(files, key=lambda f: (f.size // 10000, f.extension))
+        elif strategy == 'mixed':
+            # Mixed strategy: extension first, then size
+            return sorted(files, key=lambda f: (f.extension, f.size // 10000))
+        else:
+            return files
+
+    async def _classify_files_batch_async(
+        self,
+        files: List[FileInfo],
+        batch_size: int,
+        max_concurrent: int
+    ) -> Dict[FileInfo, Optional[Classification]]:
+        """
+        Asynchronously classify files in batches with controlled concurrency.
+
+        Args:
+            files: List of file information objects
+            batch_size: Maximum files per batch
+            max_concurrent: Maximum concurrent API requests
+
+        Returns:
+            Dictionary mapping files to classifications
+        """
+        classification_map = {}
+        total_files = len(files)
+
+        # Apply intelligent file grouping
+        batch_config = self.config.get('performance', {}).get('batch_processing', {})
+        grouping_strategy = batch_config.get('grouping_strategy', 'extension')
+
+        if grouping_strategy != 'none':
+            logger.info(f"Grouping files by strategy: {grouping_strategy}")
+            files = self._group_files_intelligently(files, grouping_strategy)
+
+        # Create semaphore to limit concurrent requests
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def classify_with_semaphore(file_info: FileInfo, index: int) -> tuple:
+            """Classify a single file with semaphore-controlled concurrency."""
+            async with semaphore:
+                logger.info(f"Classifying [{index + 1}/{total_files}]: {file_info.name}")
+                classification = await self.ai_classifier.classify_async(file_info)
+
+                if classification is None:
+                    logger.warning(f"Failed to classify: {file_info.name}")
+
+                return (file_info, classification)
+
+        # Process files in batches
+        for batch_start in range(0, total_files, batch_size):
+            batch_end = min(batch_start + batch_size, total_files)
+            batch_files = files[batch_start:batch_end]
+
+            logger.info(f"Processing batch {batch_start // batch_size + 1}: "
+                       f"files {batch_start + 1}-{batch_end} of {total_files}")
+
+            # Create tasks for this batch
+            tasks = [
+                classify_with_semaphore(file_info, batch_start + i)
+                for i, file_info in enumerate(batch_files)
+            ]
+
+            # Execute batch concurrently with controlled concurrency
+            batch_start_time = time.time()
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            batch_time = time.time() - batch_start_time
+
+            # Process results
+            batch_success = 0
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Batch classification error: {result}")
+                elif isinstance(result, tuple):
+                    file_info, classification = result
+                    classification_map[file_info] = classification
+                    if classification is not None:
+                        batch_success += 1
+
+            # Calculate batch performance metrics
+            files_per_second = len(batch_files) / batch_time if batch_time > 0 else 0
+            logger.info(f"Batch completed in {batch_time:.2f}s: "
+                       f"{batch_success}/{len(batch_files)} successful "
+                       f"({files_per_second:.1f} files/sec)")
+
+        classified = sum(1 for c in classification_map.values() if c is not None)
+        logger.info(f"Successfully classified {classified}/{total_files} files")
 
         return classification_map
 

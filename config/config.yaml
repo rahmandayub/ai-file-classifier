@@ -119,10 +119,55 @@ operations:
 
 # Performance Settings
 performance:
-  batch_size: 50
+  batch_size: 50  # Legacy setting, use batch_processing.batch_size instead
   max_workers: 10
   max_memory_mb: 500
   enable_profiling: false
+
+  # Advanced Batch Processing Configuration
+  batch_processing:
+    # Enable/disable batch processing (if false, uses serial processing)
+    enabled: true
+
+    # Batch size: number of files to process per batch
+    # Larger batches = better throughput, more memory usage
+    # Recommended: 20-100 for local Ollama, 50-200 for cloud APIs
+    batch_size: 50
+
+    # File grouping strategy for intelligent batching
+    # Options: 'extension' | 'size' | 'mixed' | 'none'
+    # - extension: Groups files by type for better classification context
+    # - size: Groups by size categories for memory management
+    # - mixed: Hybrid approach balancing both factors
+    # - none: No grouping (process in original order)
+    grouping_strategy: 'extension'
+
+    # Multi-file batch requests (ADVANCED - reduces API calls significantly)
+    # Sends multiple files in a single LLM request
+    multi_file_requests:
+      # Enable multi-file batching (experimental)
+      enabled: false
+
+      # Maximum files per single API request
+      # Higher = fewer API calls but larger token usage per request
+      # Recommended: 3-5 for most LLMs, 2-3 for smaller context windows
+      max_files_per_request: 5
+
+      # Only use multi-file batching for files with same extension
+      same_extension_only: true
+
+    # Performance tuning
+    tuning:
+      # Adaptive batching: automatically adjust batch size based on performance
+      adaptive_batch_size: false
+
+      # Target processing rate (files per second)
+      # System will try to optimize batch size to achieve this rate
+      target_rate: 2.0
+
+      # Memory-aware batching: reduce batch size if memory usage is high
+      memory_aware: true
+      memory_threshold_percent: 80
 
   content_analysis:
     max_file_size_mb: 1
