@@ -142,19 +142,25 @@ performance:
     # - none: No grouping (process in original order)
     grouping_strategy: 'extension'
 
-    # Multi-file batch requests (ADVANCED - reduces API calls significantly)
-    # Sends multiple files in a single LLM request
+    # Multi-file batch requests - TRUE BATCH PROCESSING
+    # Sends multiple files in a single LLM request (dramatically reduces API calls)
     multi_file_requests:
-      # Enable multi-file batching (experimental)
-      enabled: false
+      # Enable TRUE batch processing (multiple files per API request)
+      # ENABLED BY DEFAULT for maximum performance and cost savings
+      enabled: true
 
       # Maximum files per single API request
       # Higher = fewer API calls but larger token usage per request
-      # Recommended: 3-5 for most LLMs, 2-3 for smaller context windows
-      max_files_per_request: 5
+      # Default: 10 files per request (100 files = 10 API requests instead of 100!)
+      # Recommended ranges:
+      #   - Local Ollama: 5-10 files per request
+      #   - Cloud APIs (OpenAI/Anthropic): 10-20 files per request
+      #   - Small context models: 3-5 files per request
+      max_files_per_request: 10
 
       # Only use multi-file batching for files with same extension
-      same_extension_only: true
+      # Set to false to batch any files together
+      same_extension_only: false
 
     # Performance tuning
     tuning:
