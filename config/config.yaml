@@ -20,10 +20,10 @@ api:
   model_name: "gemma3:latest"
   temperature: 0.2
   max_tokens: 1000
-  timeout: 30
+  timeout: 60  # Increased for batch requests with multiple files
   max_retries: 3
   retry_delay: 2 # seconds
-  max_concurrent_requests: 5
+  max_concurrent_requests: 1  # Not used in sequential mode (kept for compatibility)
   requests_per_minute: 60
 
 # Classification Settings
@@ -144,6 +144,7 @@ performance:
 
     # Multi-file batch requests - TRUE BATCH PROCESSING
     # Sends multiple files in a single LLM request (dramatically reduces API calls)
+    # NOTE: Batches are processed SEQUENTIALLY (one at a time) to prevent overwhelming the LLM
     multi_file_requests:
       # Enable TRUE batch processing (multiple files per API request)
       # ENABLED BY DEFAULT for maximum performance and cost savings
@@ -151,11 +152,12 @@ performance:
 
       # Maximum files per single API request
       # Higher = fewer API calls but larger token usage per request
-      # Default: 10 files per request (100 files = 10 API requests instead of 100!)
+      # Default: 10 files per request (100 files = 10 sequential API requests instead of 100!)
       # Recommended ranges:
-      #   - Local Ollama: 5-10 files per request
+      #   - Local Ollama: 5-10 files per request (processed sequentially)
       #   - Cloud APIs (OpenAI/Anthropic): 10-20 files per request
       #   - Small context models: 3-5 files per request
+      # NOTE: Batches are processed one at a time, not concurrently
       max_files_per_request: 10
 
       # Only use multi-file batching for files with same extension
