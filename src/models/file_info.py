@@ -20,6 +20,29 @@ class FileInfo:
     mime_type: Optional[str] = None
     metadata: Optional[dict] = None
 
+    def __hash__(self) -> int:
+        """
+        Hash based on file path for use as dictionary key.
+
+        Returns:
+            Hash value based on file path
+        """
+        return hash(self.path)
+
+    def __eq__(self, other) -> bool:
+        """
+        Equality based on file path.
+
+        Args:
+            other: Another FileInfo object
+
+        Returns:
+            True if paths are equal
+        """
+        if not isinstance(other, FileInfo):
+            return False
+        return self.path == other.path
+
     @classmethod
     def from_path(cls, file_path: Path, read_content: bool = False, max_content_length: int = 5000) -> 'FileInfo':
         """
