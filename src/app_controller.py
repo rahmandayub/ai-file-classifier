@@ -39,12 +39,14 @@ class ApplicationController:
         """Initialize all application components."""
         logger.info("Initializing application components...")
 
-        # Cache manager
+        # Cache manager with optimized binary serialization
         cache_config = self.config['app']
+        use_binary = cache_config.get('cache_format', 'binary') == 'binary'
         self.cache_manager = CacheManager(
             cache_dir=cache_config.get('cache_dir', '.cache'),
             ttl_hours=cache_config.get('cache_ttl_hours', 24),
-            enabled=cache_config.get('cache_enabled', True)
+            enabled=cache_config.get('cache_enabled', True),
+            use_binary=use_binary  # NEW: Use optimized binary serialization
         ) if cache_config.get('cache_enabled', True) else None
 
         # LLM client
@@ -283,26 +285,132 @@ class ApplicationController:
         strategy: str = 'extension'
     ) -> List[FileInfo]:
         """
-        Group and sort files intelligently for better batch processing.
+        Group and sort files intelligently for optimal batch processing and LLM context.
+
+        This uses advanced grouping strategies to:
+        1. Improve classification accuracy by giving LLM similar files together
+        2. Optimize cache locality (similar files likely in same categories)
+        3. Balance batch sizes for consistent performance
 
         Args:
             files: List of file information objects
-            strategy: Grouping strategy ('extension', 'size', 'mixed')
+            strategy: Grouping strategy ('extension', 'size', 'mixed', 'semantic', 'balanced')
 
         Returns:
-            Reordered list of files
+            Reordered list of files optimized for batch processing
         """
         if strategy == 'extension':
             # Group by extension for better classification context
+            # Files of same type together helps LLM understand patterns
             return sorted(files, key=lambda f: (f.extension, f.size))
+
         elif strategy == 'size':
             # Group by size categories for memory management
-            return sorted(files, key=lambda f: (f.size // 10000, f.extension))
+            # Prevents mixing tiny and huge files in same batch
+            size_category = lambda f: (
+                0 if f.size < 1024 else  # < 1KB
+                1 if f.size < 102400 else  # < 100KB
+                2 if f.size < 1048576 else  # < 1MB
+                3 if f.size < 10485760 else  # < 10MB
+                4  # >= 10MB
+            )
+            return sorted(files, key=lambda f: (size_category(f), f.extension))
+
         elif strategy == 'mixed':
-            # Mixed strategy: extension first, then size
-            return sorted(files, key=lambda f: (f.extension, f.size // 10000))
+            # Balanced strategy: extension first, then size buckets
+            # Best overall performance for most workloads
+            size_bucket = lambda f: f.size // 102400  # 100KB buckets
+            return sorted(files, key=lambda f: (f.extension, size_bucket(f)))
+
+        elif strategy == 'semantic':
+            # Semantic grouping: group by file type categories
+            # Groups code files, documents, media, etc. together
+            return sorted(files, key=lambda f: (
+                self._get_file_category(f),
+                f.extension,
+                f.size // 102400
+            ))
+
+        elif strategy == 'balanced':
+            # Balanced distribution to avoid skewed batches
+            # Distributes file types evenly across batches
+            from collections import defaultdict
+            import itertools
+
+            # Group files by extension
+            ext_groups = defaultdict(list)
+            for file in files:
+                ext_groups[file.extension].append(file)
+
+            # Sort each group by size
+            for ext in ext_groups:
+                ext_groups[ext].sort(key=lambda f: f.size)
+
+            # Interleave groups to balance batches
+            balanced = []
+            iterators = [iter(group) for group in ext_groups.values()]
+
+            while iterators:
+                for it in list(iterators):
+                    try:
+                        balanced.append(next(it))
+                    except StopIteration:
+                        iterators.remove(it)
+
+            return balanced
+
         else:
+            # No grouping - original order
             return files
+
+    def _get_file_category(self, file_info: FileInfo) -> str:
+        """
+        Categorize file by type for semantic grouping.
+
+        Args:
+            file_info: File information object
+
+        Returns:
+            Category string ('code', 'document', 'media', 'data', 'archive', 'other')
+        """
+        ext = file_info.extension.lower()
+
+        # Code files
+        if ext in {'.py', '.js', '.java', '.cpp', '.c', '.h', '.cs', '.go', '.rs',
+                   '.rb', '.php', '.swift', '.kt', '.ts', '.tsx', '.jsx', '.vue',
+                   '.scala', '.r', '.m', '.sh', '.bat', '.ps1'}:
+            return 'code'
+
+        # Documents
+        elif ext in {'.pdf', '.doc', '.docx', '.txt', '.md', '.rtf', '.odt',
+                     '.tex', '.epub'}:
+            return 'document'
+
+        # Spreadsheets and presentations
+        elif ext in {'.xls', '.xlsx', '.csv', '.ods', '.ppt', '.pptx', '.odp'}:
+            return 'office'
+
+        # Media files
+        elif ext in {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp',
+                     '.mp4', '.avi', '.mov', '.mkv', '.mp3', '.wav', '.flac',
+                     '.ogg', '.aac'}:
+            return 'media'
+
+        # Data files
+        elif ext in {'.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg',
+                     '.conf', '.sql', '.db', '.sqlite'}:
+            return 'data'
+
+        # Archives
+        elif ext in {'.zip', '.tar', '.gz', '.bz2', '.7z', '.rar', '.xz'}:
+            return 'archive'
+
+        # Web files
+        elif ext in {'.html', '.css', '.scss', '.sass', '.less'}:
+            return 'web'
+
+        else:
+            return 'other'
 
     async def _classify_files_batch_async(
         self,
