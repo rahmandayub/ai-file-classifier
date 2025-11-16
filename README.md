@@ -18,38 +18,126 @@ A Python-based intelligent application that automatically analyzes, classifies, 
 - Python 3.10 or higher
 - OpenAI API key (for OpenAI) or local LLM server (Ollama, LocalAI)
 
+## Quick Install
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/ai-file-classifier.git
+cd ai-file-classifier
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install
+pip install --upgrade pip
+pip install -e .
+
+# Verify
+python -m src.main --version
+```
+
 ## Installation
 
-### From Source
+### Prerequisites
+
+Modern Python installations require using virtual environments. Ensure you have Python 3.10 or higher installed:
+
+```bash
+python3 --version  # Should be 3.10 or higher
+```
+
+### From Source (Recommended)
+
+#### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/ai-file-classifier.git
 cd ai-file-classifier
+```
+
+#### 2. Create and Activate Virtual Environment
+
+**On Linux/macOS:**
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
+```
+
+**On Windows:**
+```cmd
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+venv\Scripts\activate
+```
+
+You should see `(venv)` in your terminal prompt, indicating the virtual environment is active.
+
+#### 3. Install Dependencies
+
+```bash
+# Upgrade pip
+pip install --upgrade pip
+
+# Install the package in editable mode
 pip install -e .
 ```
 
-### Using pip
+#### 4. Verify Installation
 
 ```bash
+python -m src.main --version
+```
+
+### Using pip (When Available)
+
+```bash
+# Create and activate virtual environment first (see above)
 pip install ai-file-classifier
+```
+
+### Deactivating Virtual Environment
+
+When you're done, deactivate the virtual environment:
+
+```bash
+deactivate
 ```
 
 ## Quick Start
 
-### 1. Set Up Environment
+### 1. Set Up API Configuration
 
 Create a `.env` file (or set environment variables):
 
+**For OpenAI:**
 ```bash
-# For OpenAI
-export OPENAI_API_KEY="your-api-key-here"
-
-# Or use the .env.example template
+# Copy the example environment file
 cp .env.example .env
-# Edit .env with your API key
+
+# Edit .env and add your API key
+# OPENAI_API_KEY=your_openai_api_key_here
 ```
 
+**For Ollama (Local LLM - No API Key Required):**
+```bash
+# Install Ollama from https://ollama.ai
+ollama serve
+
+# Pull a model
+ollama pull llama3.2
+```
+
+The default configuration uses Ollama, so no API key is needed if you're running Ollama locally.
+
 ### 2. Basic Usage
+
+**Make sure your virtual environment is activated** (you should see `(venv)` in your terminal):
 
 ```bash
 # Classify files in a directory
@@ -224,11 +312,28 @@ scanning:
 
 ## Development
 
+### Setting Up Development Environment
+
+1. **Clone and set up virtual environment** (see Installation section above)
+
+2. **Install development dependencies:**
+
+```bash
+# Make sure virtual environment is activated
+pip install -e ".[dev]"
+```
+
 ### Running Tests
 
 ```bash
-pip install -e ".[dev]"
+# Ensure virtual environment is activated
 pytest
+
+# With coverage report
+pytest --cov=src --cov-report=html
+
+# Run specific test file
+pytest tests/test_file_scanner.py -v
 ```
 
 ### Code Structure
@@ -252,10 +357,29 @@ ai-file-classifier/
 
 ### Common Issues
 
-1. **API Connection Error**: Check your API key and base URL
-2. **Rate Limiting**: Adjust `requests_per_minute` in config
-3. **Out of Memory**: Reduce `batch_size` and `max_workers`
-4. **Permission Denied**: Ensure you have write access to destination directory
+1. **"externally-managed-environment" error**:
+   - **Solution**: Always use a virtual environment (see Installation section)
+   - This error occurs when trying to install packages globally on modern Python installations
+
+2. **Virtual environment not activated**:
+   - **Solution**: Run `source venv/bin/activate` (Linux/macOS) or `venv\Scripts\activate` (Windows)
+   - Check for `(venv)` in your terminal prompt
+
+3. **API Connection Error**:
+   - Check your API key and base URL
+   - For Ollama: ensure `ollama serve` is running
+
+4. **Rate Limiting**:
+   - Adjust `requests_per_minute` in config
+   - Consider using a local LLM (Ollama) for unlimited requests
+
+5. **Out of Memory**:
+   - Reduce `batch_size` and `max_workers` in config
+   - Reduce `max_content_length` for large files
+
+6. **Permission Denied**:
+   - Ensure you have write access to destination directory
+   - Try running with appropriate permissions
 
 ### Enable Debug Logging
 
