@@ -369,92 +369,89 @@ class ApplicationController:
         """
         Classify files using TRUE batch processing: multiple files per API request.
 
+        Processes batches SEQUENTIALLY (one at a time) to avoid overwhelming the LLM.
         This sends N files in a single API request, dramatically reducing total API calls.
-        Example: 100 files with files_per_request=10 → only 10 API requests!
+        Example: 100 files with files_per_request=10 → only 10 API requests (sequential)!
 
         Args:
             files: List of file information objects
             files_per_request: Number of files to send in each API request
-            max_concurrent: Maximum concurrent batch requests
+            max_concurrent: Not used (kept for API compatibility)
             total_files: Total number of files being processed
 
         Returns:
             Dictionary mapping files to classifications
         """
         classification_map = {}
+        total_success = 0
+        total_failed = 0
 
-        # Create semaphore to limit concurrent batch requests
-        semaphore = asyncio.Semaphore(max_concurrent)
+        # Calculate total batches
+        total_batches = (total_files + files_per_request - 1) // files_per_request
 
-        async def classify_batch_with_semaphore(
-            batch_files: List[FileInfo],
-            batch_num: int,
-            batch_start_idx: int
-        ) -> List[tuple]:
-            """Classify a batch of files in a single API request."""
-            async with semaphore:
-                logger.info(
-                    f"API Request {batch_num}: Classifying files {batch_start_idx + 1}-{batch_start_idx + len(batch_files)} "
-                    f"({len(batch_files)} files in 1 request)"
-                )
+        logger.info(
+            f"Processing {total_files} files in {total_batches} sequential API requests "
+            f"({files_per_request} files per request)"
+        )
 
-                # Send multiple files in ONE API request
+        overall_start_time = time.time()
+
+        # Process batches SEQUENTIALLY (one at a time)
+        for batch_num, i in enumerate(range(0, total_files, files_per_request), 1):
+            batch_files = files[i:i + files_per_request]
+            batch_start_idx = i
+
+            logger.info(
+                f"API Request {batch_num}/{total_batches}: Classifying files "
+                f"{batch_start_idx + 1}-{batch_start_idx + len(batch_files)} "
+                f"({len(batch_files)} files in 1 request)"
+            )
+
+            # Send multiple files in ONE API request (SEQUENTIAL - no concurrency)
+            batch_start_time = time.time()
+            try:
                 classifications = await self.ai_classifier.classify_multi_file_batch(
                     batch_files,
                     max_files_per_request=files_per_request
                 )
 
-                # Create result tuples
-                results = []
+                batch_time = time.time() - batch_start_time
+
+                # Process results for this batch
+                batch_success = 0
                 for file_info, classification in zip(batch_files, classifications):
-                    if classification is None:
-                        logger.warning(f"Failed to classify: {file_info.name}")
-                    results.append((file_info, classification))
-
-                return results
-
-        # Split files into batches for multi-file requests
-        batch_tasks = []
-        for batch_num, i in enumerate(range(0, total_files, files_per_request), 1):
-            batch_files = files[i:i + files_per_request]
-            task = classify_batch_with_semaphore(batch_files, batch_num, i)
-            batch_tasks.append(task)
-
-        total_batches = len(batch_tasks)
-        logger.info(
-            f"Processing {total_files} files in {total_batches} API requests "
-            f"({files_per_request} files per request)"
-        )
-
-        # Execute all batch requests (with concurrency control via semaphore)
-        batch_start_time = time.time()
-        all_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-        batch_time = time.time() - batch_start_time
-
-        # Process results
-        total_success = 0
-        total_failed = 0
-
-        for result in all_results:
-            if isinstance(result, Exception):
-                logger.error(f"Batch classification error: {result}")
-                total_failed += 1
-            elif isinstance(result, list):
-                for file_info, classification in result:
                     classification_map[file_info] = classification
                     if classification is not None:
                         total_success += 1
+                        batch_success += 1
                     else:
                         total_failed += 1
+                        logger.warning(f"Failed to classify: {file_info.name}")
 
-        # Performance metrics
+                # Batch metrics
+                files_per_sec = len(batch_files) / batch_time if batch_time > 0 else 0
+                logger.info(
+                    f"Batch {batch_num}/{total_batches} completed in {batch_time:.2f}s: "
+                    f"{batch_success}/{len(batch_files)} successful ({files_per_sec:.1f} files/sec)"
+                )
+
+            except Exception as e:
+                batch_time = time.time() - batch_start_time
+                logger.error(f"Batch {batch_num}/{total_batches} failed: {e}")
+                # Mark all files in this batch as failed
+                for file_info in batch_files:
+                    classification_map[file_info] = None
+                    total_failed += 1
+
+        # Overall performance metrics
+        overall_time = time.time() - overall_start_time
         api_calls_saved = total_files - total_batches
         savings_percent = (api_calls_saved / total_files * 100) if total_files > 0 else 0
-        files_per_second = total_files / batch_time if batch_time > 0 else 0
+        overall_files_per_second = total_files / overall_time if overall_time > 0 else 0
 
         logger.info(
-            f"Batch processing completed in {batch_time:.2f}s: "
-            f"{total_success}/{total_files} successful ({files_per_second:.1f} files/sec)"
+            f"Batch processing completed in {overall_time:.2f}s: "
+            f"{total_success}/{total_files} successful ({overall_files_per_second:.1f} files/sec)"
         )
         logger.info(
             f"API efficiency: {total_batches} requests instead of {total_files} "
