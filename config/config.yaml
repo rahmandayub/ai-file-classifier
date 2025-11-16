@@ -1,0 +1,137 @@
+# AI File Classifier Configuration
+
+# Application Settings
+app:
+  name: "AI File Classifier"
+  version: "1.0.0"
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_file: "logs/classifier.log"
+  log_rotation: true
+  max_log_size_mb: 10
+  cache_enabled: true
+  cache_dir: ".cache"
+  cache_ttl_hours: 24
+
+# API Configuration (OpenAI-compatible)
+api:
+  provider: "ollama"  # openai, ollama, localai, custom
+  api_key: "${OPENAI_API_KEY}"  # Use environment variable
+  base_url: "http://localhost:11434/v1"
+  model_name: "llama3.2"
+  temperature: 0.2
+  max_tokens: 1000
+  timeout: 30
+  max_retries: 3
+  retry_delay: 2  # seconds
+  max_concurrent_requests: 5
+  requests_per_minute: 60
+
+# Classification Settings
+classification:
+  default_strategy: "content_based"
+  confidence_threshold: 0.5
+  fallback_strategy: "heuristic"
+  max_depth: 3
+
+  strategies:
+    content_based:
+      enabled: true
+      weight: 1.0
+
+    project_based:
+      enabled: true
+      weight: 0.8
+      project_indicators: ["README", "package.json", ".git"]
+
+    date_based:
+      enabled: false
+      format: "YYYY/MM"
+
+    type_based:
+      enabled: true
+      weight: 0.6
+
+# File Scanning Settings
+scanning:
+  recursive: true
+  follow_symlinks: false
+  max_depth: null  # null for unlimited
+  ignore_hidden: true
+  ignore_patterns:
+    - "node_modules"
+    - ".git"
+    - "__pycache__"
+    - "*.tmp"
+    - ".DS_Store"
+
+  file_filters:
+    extensions:
+      include: []  # Empty = all files
+      exclude: [".exe", ".dll", ".so"]
+
+    size:
+      min_bytes: 0
+      max_bytes: 104857600  # 100 MB
+
+    date:
+      modified_after: null
+      modified_before: null
+
+# Directory Management
+directories:
+  naming_convention: "snake_case"  # snake_case, kebab-case, PascalCase, camelCase
+  sanitize_names: true
+  max_name_length: 100
+  conflict_resolution: "append_counter"  # append_counter, append_timestamp, skip
+  create_index_files: false
+
+# File Operations
+operations:
+  mode: "move"  # move or copy
+  preserve_metadata: true
+  preserve_permissions: true
+  atomic_operations: true
+  verify_after_move: true
+
+  duplicate_handling: "rename"  # skip, rename, overwrite
+  rename_pattern: "{name}_{counter}{ext}"
+
+  backup:
+    enabled: false
+    backup_dir: ".backup"
+    keep_days: 7
+
+# Performance Settings
+performance:
+  batch_size: 50
+  max_workers: 10
+  max_memory_mb: 500
+  enable_profiling: false
+
+  content_analysis:
+    max_file_size_mb: 1
+    read_chunk_size_kb: 64
+    max_content_length: 5000  # characters
+
+# Reporting
+reporting:
+  enabled: true
+  output_dir: "reports"
+  formats: ["json", "csv", "html"]
+  include_details: true
+  include_statistics: true
+  include_errors: true
+
+# Extensions/Plugins
+extensions:
+  enabled: true
+  plugin_directory: "./plugins"
+  auto_load: true
+
+# User Preferences
+preferences:
+  interactive_mode: false
+  confirm_before_execute: true
+  show_progress: true
+  dry_run_default: false
+  verbose: false
