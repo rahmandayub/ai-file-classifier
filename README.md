@@ -20,6 +20,31 @@ A Python-based intelligent application that automatically analyzes, classifies, 
 
 ## Quick Install
 
+### Automated Setup (Recommended)
+
+**Linux/macOS:**
+```bash
+git clone https://github.com/yourusername/ai-file-classifier.git
+cd ai-file-classifier
+./setup.sh
+```
+
+**Windows:**
+```cmd
+git clone https://github.com/yourusername/ai-file-classifier.git
+cd ai-file-classifier
+setup.bat
+```
+
+The setup script will automatically:
+- Check Python version (3.10+)
+- Create virtual environment
+- Install dependencies
+- Create `.env` file from template
+- Verify installation
+
+### Manual Setup
+
 ```bash
 # Clone repository
 git clone https://github.com/yourusername/ai-file-classifier.git
