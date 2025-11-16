@@ -662,7 +662,7 @@ api:
   provider: ollama
   api_key: ollama  # Dummy key
   base_url: http://localhost:11434/v1
-  model_name: llama3.2
+  model_name: gemma3:latest
   temperature: 0.2
   max_tokens: 1000
   timeout: 60
@@ -1443,7 +1443,7 @@ api:
   provider: "ollama"  # openai, ollama, localai, custom
   api_key: "${OPENAI_API_KEY}"  # Environment variable
   base_url: "http://localhost:11434/v1"
-  model_name: "llama3.2"
+  model_name: "gemma3:latest"
   temperature: 0.2
   max_tokens: 1000
   timeout: 30

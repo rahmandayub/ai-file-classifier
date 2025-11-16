@@ -155,7 +155,7 @@ cp .env.example .env
 ollama serve
 
 # Pull a model
-ollama pull llama3.2
+ollama pull gemma3:latest
 ```
 
 The default configuration uses Ollama, so no API key is needed if you're running Ollama locally.
@@ -191,7 +191,7 @@ api:
   provider: "ollama"  # openai, ollama, localai, custom
   api_key: "${OPENAI_API_KEY}"
   base_url: "http://localhost:11434/v1"
-  model_name: "llama3.2"
+  model_name: "gemma3:latest"
   temperature: 0.2
   max_tokens: 1000
 ```
@@ -236,7 +236,7 @@ python -m src.main classify ~/Projects ~/Projects/Organized
 1. Install and start Ollama:
 ```bash
 ollama serve
-ollama pull llama3.2
+ollama pull gemma3:latest
 ```
 
 2. Update `config/config.yaml`:
@@ -244,7 +244,7 @@ ollama pull llama3.2
 api:
   provider: "ollama"
   base_url: "http://localhost:11434/v1"
-  model_name: "llama3.2"
+  model_name: "gemma3:latest"
 ```
 
 3. Run classifier:

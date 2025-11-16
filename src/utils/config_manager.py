@@ -8,8 +8,8 @@ from typing import Any, Dict, Optional
 import yaml
 
 from .exceptions import ConfigurationError
-from .validators import ConfigValidator
 from .logger import get_logger
+from .validators import ConfigValidator
 
 logger = get_logger()
 
@@ -17,7 +17,7 @@ logger = get_logger()
 class ConfigManager:
     """Manages application configuration."""
 
-    _instance: Optional['ConfigManager'] = None
+    _instance: Optional["ConfigManager"] = None
     _config: Optional[Dict[str, Any]] = None
 
     def __new__(cls):
@@ -49,7 +49,7 @@ class ConfigManager:
                 if not config_file.exists():
                     raise ConfigurationError(f"Config file not found: {config_path}")
 
-                with open(config_file, 'r') as f:
+                with open(config_file, "r") as f:
                     config = yaml.safe_load(f)
 
                 logger.info(f"Loaded configuration from {config_path}")
@@ -82,7 +82,9 @@ class ConfigManager:
             ConfigurationError: If config not loaded
         """
         if self._config is None:
-            raise ConfigurationError("Configuration not loaded. Call load_config() first.")
+            raise ConfigurationError(
+                "Configuration not loaded. Call load_config() first."
+            )
         return self._config
 
     def get(self, key_path: str, default: Any = None) -> Any:
@@ -99,7 +101,7 @@ class ConfigManager:
         if self._config is None:
             return default
 
-        keys = key_path.split('.')
+        keys = key_path.split(".")
         value = self._config
 
         for key in keys:
@@ -118,133 +120,133 @@ class ConfigManager:
             Default configuration dictionary
         """
         return {
-            'app': {
-                'name': 'AI File Classifier',
-                'version': '1.0.0',
-                'log_level': 'INFO',
-                'log_file': 'logs/classifier.log',
-                'log_rotation': True,
-                'max_log_size_mb': 10,
-                'cache_enabled': True,
-                'cache_dir': '.cache',
-                'cache_ttl_hours': 24,
+            "app": {
+                "name": "AI File Classifier",
+                "version": "1.0.0",
+                "log_level": "INFO",
+                "log_file": "logs/classifier.log",
+                "log_rotation": True,
+                "max_log_size_mb": 10,
+                "cache_enabled": True,
+                "cache_dir": ".cache",
+                "cache_ttl_hours": 24,
             },
-            'api': {
-                'provider': 'ollama',
-                'api_key': os.getenv('OPENAI_API_KEY', 'ollama'),
-                'base_url': 'http://localhost:11434/v1',
-                'model_name': 'llama3.2',
-                'temperature': 0.2,
-                'max_tokens': 1000,
-                'timeout': 30,
-                'max_retries': 3,
-                'retry_delay': 2,
-                'max_concurrent_requests': 5,
-                'requests_per_minute': 60,
+            "api": {
+                "provider": "ollama",
+                "api_key": os.getenv("OPENAI_API_KEY", "ollama"),
+                "base_url": "http://localhost:11434/v1",
+                "model_name": "gemma3:latest",
+                "temperature": 0.2,
+                "max_tokens": 1000,
+                "timeout": 30,
+                "max_retries": 3,
+                "retry_delay": 2,
+                "max_concurrent_requests": 5,
+                "requests_per_minute": 60,
             },
-            'classification': {
-                'default_strategy': 'content_based',
-                'confidence_threshold': 0.5,
-                'fallback_strategy': 'heuristic',
-                'max_depth': 3,
-                'strategies': {
-                    'content_based': {
-                        'enabled': True,
-                        'weight': 1.0,
+            "classification": {
+                "default_strategy": "content_based",
+                "confidence_threshold": 0.5,
+                "fallback_strategy": "heuristic",
+                "max_depth": 3,
+                "strategies": {
+                    "content_based": {
+                        "enabled": True,
+                        "weight": 1.0,
                     },
-                    'project_based': {
-                        'enabled': True,
-                        'weight': 0.8,
-                        'project_indicators': ['README', 'package.json', '.git'],
+                    "project_based": {
+                        "enabled": True,
+                        "weight": 0.8,
+                        "project_indicators": ["README", "package.json", ".git"],
                     },
-                    'date_based': {
-                        'enabled': False,
-                        'format': 'YYYY/MM',
+                    "date_based": {
+                        "enabled": False,
+                        "format": "YYYY/MM",
                     },
-                    'type_based': {
-                        'enabled': True,
-                        'weight': 0.6,
+                    "type_based": {
+                        "enabled": True,
+                        "weight": 0.6,
                     },
                 },
             },
-            'scanning': {
-                'recursive': True,
-                'follow_symlinks': False,
-                'max_depth': None,
-                'ignore_hidden': True,
-                'ignore_patterns': [
-                    'node_modules',
-                    '.git',
-                    '__pycache__',
-                    '*.tmp',
-                    '.DS_Store',
+            "scanning": {
+                "recursive": True,
+                "follow_symlinks": False,
+                "max_depth": None,
+                "ignore_hidden": True,
+                "ignore_patterns": [
+                    "node_modules",
+                    ".git",
+                    "__pycache__",
+                    "*.tmp",
+                    ".DS_Store",
                 ],
-                'file_filters': {
-                    'extensions': {
-                        'include': [],
-                        'exclude': ['.exe', '.dll', '.so'],
+                "file_filters": {
+                    "extensions": {
+                        "include": [],
+                        "exclude": [".exe", ".dll", ".so"],
                     },
-                    'size': {
-                        'min_bytes': 0,
-                        'max_bytes': 104857600,  # 100 MB
+                    "size": {
+                        "min_bytes": 0,
+                        "max_bytes": 104857600,  # 100 MB
                     },
-                    'date': {
-                        'modified_after': None,
-                        'modified_before': None,
+                    "date": {
+                        "modified_after": None,
+                        "modified_before": None,
                     },
                 },
             },
-            'directories': {
-                'naming_convention': 'snake_case',
-                'sanitize_names': True,
-                'max_name_length': 100,
-                'conflict_resolution': 'append_counter',
-                'create_index_files': False,
+            "directories": {
+                "naming_convention": "snake_case",
+                "sanitize_names": True,
+                "max_name_length": 100,
+                "conflict_resolution": "append_counter",
+                "create_index_files": False,
             },
-            'operations': {
-                'mode': 'move',
-                'preserve_metadata': True,
-                'preserve_permissions': True,
-                'atomic_operations': True,
-                'verify_after_move': True,
-                'duplicate_handling': 'rename',
-                'rename_pattern': '{name}_{counter}{ext}',
-                'backup': {
-                    'enabled': False,
-                    'backup_dir': '.backup',
-                    'keep_days': 7,
+            "operations": {
+                "mode": "move",
+                "preserve_metadata": True,
+                "preserve_permissions": True,
+                "atomic_operations": True,
+                "verify_after_move": True,
+                "duplicate_handling": "rename",
+                "rename_pattern": "{name}_{counter}{ext}",
+                "backup": {
+                    "enabled": False,
+                    "backup_dir": ".backup",
+                    "keep_days": 7,
                 },
             },
-            'performance': {
-                'batch_size': 50,
-                'max_workers': 10,
-                'max_memory_mb': 500,
-                'enable_profiling': False,
-                'content_analysis': {
-                    'max_file_size_mb': 1,
-                    'read_chunk_size_kb': 64,
-                    'max_content_length': 5000,
+            "performance": {
+                "batch_size": 50,
+                "max_workers": 10,
+                "max_memory_mb": 500,
+                "enable_profiling": False,
+                "content_analysis": {
+                    "max_file_size_mb": 1,
+                    "read_chunk_size_kb": 64,
+                    "max_content_length": 5000,
                 },
             },
-            'reporting': {
-                'enabled': True,
-                'output_dir': 'reports',
-                'formats': ['json', 'csv', 'html'],
-                'include_details': True,
-                'include_statistics': True,
-                'include_errors': True,
+            "reporting": {
+                "enabled": True,
+                "output_dir": "reports",
+                "formats": ["json", "csv", "html"],
+                "include_details": True,
+                "include_statistics": True,
+                "include_errors": True,
             },
-            'extensions': {
-                'enabled': True,
-                'plugin_directory': './plugins',
-                'auto_load': True,
+            "extensions": {
+                "enabled": True,
+                "plugin_directory": "./plugins",
+                "auto_load": True,
             },
-            'preferences': {
-                'interactive_mode': False,
-                'confirm_before_execute': True,
-                'show_progress': True,
-                'dry_run_default': False,
-                'verbose': False,
+            "preferences": {
+                "interactive_mode": False,
+                "confirm_before_execute": True,
+                "show_progress": True,
+                "dry_run_default": False,
+                "verbose": False,
             },
         }
 
@@ -268,7 +270,7 @@ class ConfigManager:
                 var_name = match.group(1) or match.group(2)
                 return os.getenv(var_name, match.group(0))
 
-            pattern = r'\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)'
+            pattern = r"\$\{([^}]+)\}|\$([A-Za-z_][A-Za-z0-9_]*)"
             return re.sub(pattern, replace_env_var, config)
         else:
             return config
@@ -285,17 +287,17 @@ class ConfigManager:
         """
         try:
             # Validate API configuration
-            if 'api' in config:
-                ConfigValidator.validate_api_config(config['api'])
+            if "api" in config:
+                ConfigValidator.validate_api_config(config["api"])
 
             # Validate app configuration
-            if 'app' in config:
+            if "app" in config:
                 required_app = {
-                    'name': str,
-                    'version': str,
-                    'log_level': str,
+                    "name": str,
+                    "version": str,
+                    "log_level": str,
                 }
-                ConfigValidator.validate_config(config['app'], required_app)
+                ConfigValidator.validate_config(config["app"], required_app)
 
         except Exception as e:
             raise ConfigurationError(f"Configuration validation failed: {e}")

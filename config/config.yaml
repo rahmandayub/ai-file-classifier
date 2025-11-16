@@ -4,7 +4,7 @@
 app:
   name: "AI File Classifier"
   version: "1.0.0"
-  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_level: "INFO" # DEBUG, INFO, WARNING, ERROR, CRITICAL
   log_file: "logs/classifier.log"
   log_rotation: true
   max_log_size_mb: 10
@@ -14,15 +14,15 @@ app:
 
 # API Configuration (OpenAI-compatible)
 api:
-  provider: "ollama"  # openai, ollama, localai, custom
-  api_key: "${OPENAI_API_KEY}"  # Use environment variable
+  provider: "ollama" # openai, ollama, localai, custom
+  api_key: "${OPENAI_API_KEY}" # Use environment variable
   base_url: "http://localhost:11434/v1"
-  model_name: "llama3.2"
+  model_name: "gemma3:latest"
   temperature: 0.2
   max_tokens: 1000
   timeout: 30
   max_retries: 3
-  retry_delay: 2  # seconds
+  retry_delay: 2 # seconds
   max_concurrent_requests: 5
   requests_per_minute: 60
 
@@ -55,7 +55,7 @@ classification:
 scanning:
   recursive: true
   follow_symlinks: false
-  max_depth: null  # null for unlimited
+  max_depth: null # null for unlimited
   ignore_hidden: true
   ignore_patterns:
     - "node_modules"
@@ -66,12 +66,12 @@ scanning:
 
   file_filters:
     extensions:
-      include: []  # Empty = all files
+      include: [] # Empty = all files
       exclude: [".exe", ".dll", ".so"]
 
     size:
       min_bytes: 0
-      max_bytes: 104857600  # 100 MB
+      max_bytes: 104857600 # 100 MB
 
     date:
       modified_after: null
@@ -79,21 +79,21 @@ scanning:
 
 # Directory Management
 directories:
-  naming_convention: "snake_case"  # snake_case, kebab-case, PascalCase, camelCase
+  naming_convention: "snake_case" # snake_case, kebab-case, PascalCase, camelCase
   sanitize_names: true
   max_name_length: 100
-  conflict_resolution: "append_counter"  # append_counter, append_timestamp, skip
+  conflict_resolution: "append_counter" # append_counter, append_timestamp, skip
   create_index_files: false
 
 # File Operations
 operations:
-  mode: "move"  # move or copy
+  mode: "move" # move or copy
   preserve_metadata: true
   preserve_permissions: true
   atomic_operations: true
   verify_after_move: true
 
-  duplicate_handling: "rename"  # skip, rename, overwrite
+  duplicate_handling: "rename" # skip, rename, overwrite
   rename_pattern: "{name}_{counter}{ext}"
 
   backup:
@@ -111,7 +111,7 @@ performance:
   content_analysis:
     max_file_size_mb: 1
     read_chunk_size_kb: 64
-    max_content_length: 5000  # characters
+    max_content_length: 5000 # characters
 
 # Reporting
 reporting:
