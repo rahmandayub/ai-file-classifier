@@ -1,9 +1,11 @@
-"""File discovery and scanning module."""
+"""File discovery and scanning module with parallel I/O optimization."""
 
+import asyncio
 import fnmatch
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Set
+from concurrent.futures import ThreadPoolExecutor
 
 from ..models.file_info import FileInfo
 from ..utils.logger import get_logger
@@ -78,7 +80,7 @@ class FileFilter:
 
 
 class FileScanner:
-    """Scans directories to discover files."""
+    """Scans directories to discover files with parallel I/O optimization."""
 
     def __init__(
         self,
@@ -86,7 +88,8 @@ class FileScanner:
         follow_symlinks: bool = False,
         ignore_hidden: bool = True,
         ignore_patterns: Optional[List[str]] = None,
-        max_depth: Optional[int] = None
+        max_depth: Optional[int] = None,
+        max_workers: int = 10
     ):
         """
         Initialize the file scanner.
@@ -97,12 +100,14 @@ class FileScanner:
             ignore_hidden: Whether to ignore hidden files/directories
             ignore_patterns: List of patterns to ignore (e.g., 'node_modules', '*.tmp')
             max_depth: Maximum directory depth to scan (None = unlimited)
+            max_workers: Maximum parallel workers for content reading
         """
         self.recursive = recursive
         self.follow_symlinks = follow_symlinks
         self.ignore_hidden = ignore_hidden
         self.ignore_patterns = ignore_patterns or []
         self.max_depth = max_depth
+        self.max_workers = max_workers
 
     def scan(
         self,
@@ -112,7 +117,7 @@ class FileScanner:
         max_content_length: int = 5000
     ) -> List[FileInfo]:
         """
-        Scan directory and return list of files.
+        Scan directory and return list of files with optimized parallel I/O.
 
         Args:
             path: Directory path to scan
@@ -134,17 +139,159 @@ class FileScanner:
 
         logger.info(f"Scanning directory: {path}")
 
-        files = []
-        self._scan_directory(
-            path,
-            files,
-            file_filter,
-            read_content,
-            max_content_length,
-            current_depth=0
-        )
+        # Use optimized parallel scan if reading content
+        if read_content:
+            files = self._scan_optimized(path, file_filter, max_content_length)
+        else:
+            files = []
+            self._scan_directory(
+                path,
+                files,
+                file_filter,
+                read_content,
+                max_content_length,
+                current_depth=0
+            )
 
         logger.info(f"Found {len(files)} files")
+        return files
+
+    def _scan_optimized(
+        self,
+        path: Path,
+        file_filter: Optional[FileFilter],
+        max_content_length: int
+    ) -> List[FileInfo]:
+        """
+        Optimized scan with parallel content reading.
+
+        Args:
+            path: Directory path to scan
+            file_filter: Optional file filter
+            max_content_length: Maximum content length to read
+
+        Returns:
+            List of FileInfo objects
+        """
+        # Phase 1: Discover all file paths (fast, no I/O)
+        file_paths = []
+        self._discover_files(path, file_paths, current_depth=0)
+
+        logger.debug(f"Discovered {len(file_paths)} file paths")
+
+        # Phase 2: Create FileInfo objects in parallel (with content reading)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            files = loop.run_until_complete(
+                self._process_files_parallel(file_paths, file_filter, max_content_length)
+            )
+            return files
+        finally:
+            loop.close()
+
+    def _discover_files(
+        self,
+        directory: Path,
+        file_paths: List[Path],
+        current_depth: int
+    ) -> None:
+        """
+        Fast file path discovery without I/O (optimized).
+
+        Args:
+            directory: Directory to scan
+            file_paths: List to append discovered file paths to
+            current_depth: Current recursion depth
+        """
+        # Check depth limit
+        if self.max_depth is not None and current_depth >= self.max_depth:
+            return
+
+        try:
+            for entry in directory.iterdir():
+                # Check if symlink (and whether to follow)
+                if entry.is_symlink() and not self.follow_symlinks:
+                    continue
+
+                # Check if hidden
+                if self.ignore_hidden and entry.name.startswith('.'):
+                    continue
+
+                # Check ignore patterns
+                if self._should_ignore(entry.name):
+                    continue
+
+                # Collect file paths
+                if entry.is_file():
+                    file_paths.append(entry)
+
+                # Recurse into subdirectories
+                elif entry.is_dir() and self.recursive:
+                    if self._should_ignore(entry.name):
+                        continue
+                    self._discover_files(entry, file_paths, current_depth + 1)
+
+        except PermissionError:
+            logger.warning(f"Permission denied: {directory}")
+        except Exception as e:
+            logger.error(f"Error discovering files in {directory}: {e}")
+
+    async def _process_files_parallel(
+        self,
+        file_paths: List[Path],
+        file_filter: Optional[FileFilter],
+        max_content_length: int
+    ) -> List[FileInfo]:
+        """
+        Process files in parallel with async I/O.
+
+        Args:
+            file_paths: List of file paths to process
+            file_filter: Optional file filter
+            max_content_length: Maximum content length to read
+
+        Returns:
+            List of FileInfo objects
+        """
+        # Create tasks for parallel processing
+        semaphore = asyncio.Semaphore(self.max_workers)
+
+        async def process_file(file_path: Path) -> Optional[FileInfo]:
+            """Process a single file with semaphore control."""
+            async with semaphore:
+                try:
+                    # Run blocking I/O in thread pool
+                    loop = asyncio.get_event_loop()
+                    file_info = await loop.run_in_executor(
+                        None,
+                        FileInfo.from_path,
+                        file_path,
+                        True,  # read_content
+                        max_content_length
+                    )
+
+                    # Apply filter
+                    if file_filter is None or file_filter.matches(file_info):
+                        return file_info
+
+                except Exception as e:
+                    logger.warning(f"Failed to process file {file_path}: {e}")
+
+                return None
+
+        # Process all files in parallel
+        tasks = [process_file(fp) for fp in file_paths]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Filter out None values and exceptions
+        files = []
+        for result in results:
+            if isinstance(result, FileInfo):
+                files.append(result)
+            elif isinstance(result, Exception):
+                logger.error(f"File processing error: {result}")
+
         return files
 
     def _scan_directory(
@@ -268,12 +415,18 @@ def create_scanner_from_config(config: dict) -> FileScanner:
     Returns:
         FileScanner instance
     """
+    # Get max_workers from performance settings if available
+    max_workers = 10  # default
+    if 'performance' in config:
+        max_workers = config['performance'].get('max_workers', 10)
+
     return FileScanner(
         recursive=config.get('recursive', True),
         follow_symlinks=config.get('follow_symlinks', False),
         ignore_hidden=config.get('ignore_hidden', True),
         ignore_patterns=config.get('ignore_patterns', []),
-        max_depth=config.get('max_depth')
+        max_depth=config.get('max_depth'),
+        max_workers=max_workers
     )
 
 

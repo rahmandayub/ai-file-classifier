@@ -44,14 +44,15 @@ class FileInfo:
         return self.path == other.path
 
     @classmethod
-    def from_path(cls, file_path: Path, read_content: bool = False, max_content_length: int = 5000) -> 'FileInfo':
+    def from_path(cls, file_path: Path, read_content: bool = False, max_content_length: int = 5000, smart_sampling: bool = True) -> 'FileInfo':
         """
-        Create FileInfo from a file path.
+        Create FileInfo from a file path with intelligent content sampling.
 
         Args:
             file_path: Path to the file
             read_content: Whether to read file content preview
             max_content_length: Maximum content length to read
+            smart_sampling: Use intelligent sampling (beginning, middle, end) for large files
 
         Returns:
             FileInfo instance
@@ -70,9 +71,17 @@ class FileInfo:
         content_preview = None
         if read_content and cls._is_text_file(extension):
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read(max_content_length)
-                    content_preview = content[:max_content_length]
+                file_size = stat.st_size
+
+                # Use smart sampling for files larger than max_content_length
+                if smart_sampling and file_size > max_content_length:
+                    content_preview = cls._smart_sample_content(file_path, max_content_length)
+                else:
+                    # Read sequentially for small files
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read(max_content_length)
+                        content_preview = content[:max_content_length]
+
             except (IOError, UnicodeDecodeError):
                 # File might be binary or unreadable
                 pass
@@ -86,6 +95,62 @@ class FileInfo:
             modified=modified,
             content_preview=content_preview
         )
+
+    @staticmethod
+    def _smart_sample_content(file_path: Path, max_length: int) -> str:
+        """
+        Intelligently sample content from beginning, middle, and end of large files.
+
+        This provides better representation of file content than just reading the beginning,
+        especially for large files where important context might be at the end.
+
+        Args:
+            file_path: Path to the file
+            max_length: Maximum total length of sampled content
+
+        Returns:
+            Sampled content string
+        """
+        try:
+            # Allocate content budget: 50% beginning, 25% middle, 25% end
+            chunk_size = max_length // 4
+
+            samples = []
+
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                # Read beginning
+                beginning = f.read(chunk_size * 2)  # 50% of budget
+                samples.append(beginning)
+
+                # Get file size to calculate middle and end positions
+                f.seek(0, 2)  # Seek to end
+                file_size = f.tell()
+
+                # Read middle section
+                middle_pos = file_size // 2 - (chunk_size // 2)
+                if middle_pos > len(beginning):
+                    f.seek(max(0, middle_pos))
+                    middle = f.read(chunk_size)
+                    if middle and middle not in beginning:  # Avoid duplicates for small files
+                        samples.append(f"\n... [middle section] ...\n{middle}")
+
+                # Read end section
+                end_pos = file_size - chunk_size
+                if end_pos > middle_pos + chunk_size:
+                    f.seek(max(0, end_pos))
+                    end = f.read(chunk_size)
+                    if end and end not in beginning:  # Avoid duplicates
+                        samples.append(f"\n... [end section] ...\n{end}")
+
+            return ''.join(samples)[:max_length]
+
+        except (IOError, UnicodeDecodeError):
+            # Fallback to simple read if smart sampling fails
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    return f.read(max_length)
+            except:
+                return ""
 
     @staticmethod
     def _is_text_file(extension: str) -> bool:
