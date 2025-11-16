@@ -106,30 +106,78 @@ class LLMClient:
 class AIClassifier:
     """AI-powered file classifier using LLM."""
 
-    SYSTEM_PROMPT = """You are an expert file organization assistant. Your task is to analyze file information and suggest appropriate directory classifications.
+    SYSTEM_PROMPT_TEMPLATE = """You are an expert file organization assistant. Your task is to analyze file information and suggest appropriate directory classifications.
 
 Rules:
-1. Provide concise, meaningful directory names
+1. Provide concise, meaningful directory names IN {language} LANGUAGE
 2. Use hierarchical structure (parent/child) when appropriate
 3. Avoid overly specific categories (max 3 levels deep)
 4. Consider file content, name, and metadata
 5. Return results in valid JSON format
+6. ALL directory names (primary_category, subcategory, sub_subcategory) MUST be in {language}
+
+Language-specific examples for {language}:
+{examples}
 
 Output format:
-{
-  "primary_category": "string",
-  "subcategory": "string or null",
-  "sub_subcategory": "string or null",
+{{
+  "primary_category": "string (in {language})",
+  "subcategory": "string or null (in {language})",
+  "sub_subcategory": "string or null (in {language})",
   "confidence": float (0.0-1.0),
-  "reasoning": "string"
-}"""
+  "reasoning": "string (can be in English)"
+}}"""
+
+    LANGUAGE_EXAMPLES = {
+        "indonesian": """- Documents → "Dokumen"
+- Financial Reports → "Laporan Keuangan"
+- Personal Photos → "Foto Pribadi"
+- Work Projects → "Proyek Pekerjaan"
+- Music → "Musik"
+- Videos → "Video"
+- Archives → "Arsip"
+- Downloads → "Unduhan"
+- Images → "Gambar"
+- Spreadsheets → "Lembar Kerja"
+- Presentations → "Presentasi"
+- Code → "Kode Program"
+- Books → "Buku"
+- Contracts → "Kontrak"
+- Invoices → "Faktur"
+- Receipts → "Kwitansi"
+- Tax Documents → "Dokumen Pajak"
+- Annual Reports → "Laporan Tahunan"
+- Meeting Notes → "Catatan Rapat"
+- Research → "Penelitian"
+""",
+        "english": """- Documents → "Documents"
+- Financial Reports → "Financial Reports"
+- Personal Photos → "Personal Photos"
+- Work Projects → "Work Projects"
+- Music → "Music"
+- Videos → "Videos"
+- Archives → "Archives"
+""",
+        "spanish": """- Documents → "Documentos"
+- Financial Reports → "Informes Financieros"
+- Personal Photos → "Fotos Personales"
+- Work Projects → "Proyectos de Trabajo"
+""",
+        "french": """- Documents → "Documents"
+- Financial Reports → "Rapports Financiers"
+- Personal Photos → "Photos Personnelles"
+- Work Projects → "Projets de Travail"
+"""
+    }
 
     def __init__(
         self,
         llm_client: LLMClient,
         cache_manager: Optional[CacheManager] = None,
         max_retries: int = 3,
-        retry_delay: int = 2
+        retry_delay: int = 2,
+        language: str = "english",
+        fallback_language: str = "english"
     ):
         """
         Initialize the AI classifier.
@@ -139,11 +187,37 @@ Output format:
             cache_manager: Optional cache manager
             max_retries: Maximum number of retry attempts
             retry_delay: Delay between retries in seconds
+            language: Primary language for directory names
+            fallback_language: Fallback language if primary not available
         """
         self.llm_client = llm_client
         self.cache_manager = cache_manager
         self.max_retries = max_retries
         self.retry_delay = retry_delay
+        self.language = language.lower()
+        self.fallback_language = fallback_language.lower()
+
+        # Build system prompt with language-specific examples
+        self.system_prompt = self._build_system_prompt()
+
+    def _build_system_prompt(self) -> str:
+        """
+        Build system prompt with language-specific examples.
+
+        Returns:
+            Formatted system prompt string
+        """
+        # Get examples for the selected language
+        examples = self.LANGUAGE_EXAMPLES.get(
+            self.language,
+            self.LANGUAGE_EXAMPLES.get(self.fallback_language, self.LANGUAGE_EXAMPLES["english"])
+        )
+
+        # Format the prompt
+        return self.SYSTEM_PROMPT_TEMPLATE.format(
+            language=self.language.upper(),
+            examples=examples
+        )
 
     def classify(self, file_info: FileInfo) -> Optional[Classification]:
         """
@@ -170,7 +244,7 @@ Output format:
         # Build prompt
         prompt = self._build_content_prompt(file_info)
         messages = [
-            {"role": "system", "content": self.SYSTEM_PROMPT},
+            {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": prompt}
         ]
 
@@ -238,7 +312,7 @@ Output format:
         # Build prompt
         prompt = self._build_content_prompt(file_info)
         messages = [
-            {"role": "system", "content": self.SYSTEM_PROMPT},
+            {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": prompt}
         ]
 

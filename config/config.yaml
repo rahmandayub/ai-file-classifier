@@ -85,6 +85,22 @@ directories:
   conflict_resolution: "append_counter" # append_counter, append_timestamp, skip
   create_index_files: false
 
+# Language Settings
+language:
+  primary: "indonesian" # primary language for directory names
+  fallback: "english" # fallback if primary not available
+  supported_languages:
+    - "indonesian"
+    - "english"
+    - "spanish"
+    - "french"
+    - "german"
+    - "japanese"
+    - "chinese"
+  # Language-specific naming examples:
+  # Indonesian: dokumen_keuangan, laporan_tahunan
+  # English: financial_documents, annual_reports
+
 # File Operations
 operations:
   mode: "move" # move or copy
