@@ -87,7 +87,7 @@ directories:
 
 # Language Settings
 language:
-  primary: "indonesian" # primary language for directory names
+  primary: "english" # primary language for directory names (use --language CLI arg to override)
   fallback: "english" # fallback if primary not available
   supported_languages:
     - "indonesian"

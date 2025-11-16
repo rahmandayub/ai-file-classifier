@@ -12,6 +12,42 @@ from .utils.validators import PathValidator
 from .utils.exceptions import ClassifierError, ConfigurationError, ValidationError
 
 
+def normalize_language_code(language: str) -> str:
+    """
+    Normalize language code to full language name.
+
+    Args:
+        language: Language code or full name
+
+    Returns:
+        Normalized language name
+    """
+    language_map = {
+        'id': 'indonesian',
+        'indonesian': 'indonesian',
+        'en': 'english',
+        'english': 'english',
+        'es': 'spanish',
+        'spanish': 'spanish',
+        'fr': 'french',
+        'french': 'french',
+        'de': 'german',
+        'german': 'german',
+        'ja': 'japanese',
+        'japanese': 'japanese',
+        'zh': 'chinese',
+        'chinese': 'chinese'
+    }
+
+    normalized = language_map.get(language.lower())
+    if not normalized:
+        raise ValidationError(
+            f"Unsupported language: {language}. "
+            f"Supported: id/indonesian, en/english, es/spanish, fr/french, de/german, ja/japanese, zh/chinese"
+        )
+    return normalized
+
+
 def create_parser() -> argparse.ArgumentParser:
     """
     Create and configure argument parser.
@@ -29,6 +65,12 @@ Examples:
 
   # Dry run to preview changes
   %(prog)s classify ./files ./organized --dry-run
+
+  # Use Indonesian for directory names
+  %(prog)s classify ./files ./organized --language id
+
+  # Use English for directory names
+  %(prog)s classify ./files ./organized --language en
 
   # Use custom configuration
   %(prog)s classify ./files ./organized --config config.yaml
@@ -98,6 +140,14 @@ For more information, visit: https://github.com/yourusername/ai-file-classifier
         '-q',
         action='store_true',
         help='Suppress non-error output'
+    )
+
+    classify_parser.add_argument(
+        '--language',
+        '-l',
+        type=str,
+        default=None,
+        help='Language for directory names (id/indonesian, en/english, es/spanish, fr/french, de/german, ja/japanese, zh/chinese). Default: english'
     )
 
     return parser
@@ -192,6 +242,14 @@ class CLIApp:
             # Apply CLI argument overrides to config
             if args.dry_run:
                 config['preferences']['dry_run_default'] = True
+
+            # Apply language override if specified
+            if args.language:
+                normalized_language = normalize_language_code(args.language)
+                if 'language' not in config:
+                    config['language'] = {}
+                config['language']['primary'] = normalized_language
+                self.logger.info(f"Using language from CLI: {normalized_language}")
 
             # Create application controller
             app = ApplicationController(config)
