@@ -313,6 +313,9 @@ class ApplicationController:
         """
         Asynchronously classify files in batches with controlled concurrency.
 
+        Uses TRUE batch processing: sends multiple files in a single API request
+        to dramatically reduce API calls and improve performance.
+
         Args:
             files: List of file information objects
             batch_size: Maximum files per batch
@@ -331,6 +334,158 @@ class ApplicationController:
         if grouping_strategy != 'none':
             logger.info(f"Grouping files by strategy: {grouping_strategy}")
             files = self._group_files_intelligently(files, grouping_strategy)
+
+        # Get multi-file batch settings
+        multi_file_config = batch_config.get('multi_file_requests', {})
+        use_multi_file = multi_file_config.get('enabled', True)  # TRUE by default now
+        files_per_request = multi_file_config.get('max_files_per_request', 10)
+
+        if use_multi_file:
+            # TRUE BATCH PROCESSING: Multiple files per API request
+            logger.info(f"Using TRUE batch processing: {files_per_request} files per API request")
+            return await self._classify_with_multi_file_batches(
+                files,
+                files_per_request,
+                max_concurrent,
+                total_files
+            )
+        else:
+            # CONCURRENT PROCESSING: One file per API request (legacy mode)
+            logger.info("Using concurrent processing: 1 file per API request")
+            return await self._classify_with_concurrent_requests(
+                files,
+                batch_size,
+                max_concurrent,
+                total_files
+            )
+
+    async def _classify_with_multi_file_batches(
+        self,
+        files: List[FileInfo],
+        files_per_request: int,
+        max_concurrent: int,
+        total_files: int
+    ) -> Dict[FileInfo, Optional[Classification]]:
+        """
+        Classify files using TRUE batch processing: multiple files per API request.
+
+        This sends N files in a single API request, dramatically reducing total API calls.
+        Example: 100 files with files_per_request=10 → only 10 API requests!
+
+        Args:
+            files: List of file information objects
+            files_per_request: Number of files to send in each API request
+            max_concurrent: Maximum concurrent batch requests
+            total_files: Total number of files being processed
+
+        Returns:
+            Dictionary mapping files to classifications
+        """
+        classification_map = {}
+
+        # Create semaphore to limit concurrent batch requests
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def classify_batch_with_semaphore(
+            batch_files: List[FileInfo],
+            batch_num: int,
+            batch_start_idx: int
+        ) -> List[tuple]:
+            """Classify a batch of files in a single API request."""
+            async with semaphore:
+                logger.info(
+                    f"API Request {batch_num}: Classifying files {batch_start_idx + 1}-{batch_start_idx + len(batch_files)} "
+                    f"({len(batch_files)} files in 1 request)"
+                )
+
+                # Send multiple files in ONE API request
+                classifications = await self.ai_classifier.classify_multi_file_batch(
+                    batch_files,
+                    max_files_per_request=files_per_request
+                )
+
+                # Create result tuples
+                results = []
+                for file_info, classification in zip(batch_files, classifications):
+                    if classification is None:
+                        logger.warning(f"Failed to classify: {file_info.name}")
+                    results.append((file_info, classification))
+
+                return results
+
+        # Split files into batches for multi-file requests
+        batch_tasks = []
+        for batch_num, i in enumerate(range(0, total_files, files_per_request), 1):
+            batch_files = files[i:i + files_per_request]
+            task = classify_batch_with_semaphore(batch_files, batch_num, i)
+            batch_tasks.append(task)
+
+        total_batches = len(batch_tasks)
+        logger.info(
+            f"Processing {total_files} files in {total_batches} API requests "
+            f"({files_per_request} files per request)"
+        )
+
+        # Execute all batch requests (with concurrency control via semaphore)
+        batch_start_time = time.time()
+        all_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+        batch_time = time.time() - batch_start_time
+
+        # Process results
+        total_success = 0
+        total_failed = 0
+
+        for result in all_results:
+            if isinstance(result, Exception):
+                logger.error(f"Batch classification error: {result}")
+                total_failed += 1
+            elif isinstance(result, list):
+                for file_info, classification in result:
+                    classification_map[file_info] = classification
+                    if classification is not None:
+                        total_success += 1
+                    else:
+                        total_failed += 1
+
+        # Performance metrics
+        api_calls_saved = total_files - total_batches
+        savings_percent = (api_calls_saved / total_files * 100) if total_files > 0 else 0
+        files_per_second = total_files / batch_time if batch_time > 0 else 0
+
+        logger.info(
+            f"Batch processing completed in {batch_time:.2f}s: "
+            f"{total_success}/{total_files} successful ({files_per_second:.1f} files/sec)"
+        )
+        logger.info(
+            f"API efficiency: {total_batches} requests instead of {total_files} "
+            f"({savings_percent:.1f}% reduction)"
+        )
+
+        return classification_map
+
+    async def _classify_with_concurrent_requests(
+        self,
+        files: List[FileInfo],
+        batch_size: int,
+        max_concurrent: int,
+        total_files: int
+    ) -> Dict[FileInfo, Optional[Classification]]:
+        """
+        Classify files using concurrent processing: one file per API request (legacy).
+
+        This makes N API requests for N files, but processes them concurrently
+        for better performance than serial processing.
+
+        Args:
+            files: List of file information objects
+            batch_size: Maximum files per batch
+            max_concurrent: Maximum concurrent API requests
+            total_files: Total number of files being processed
+
+        Returns:
+            Dictionary mapping files to classifications
+        """
+        classification_map = {}
 
         # Create semaphore to limit concurrent requests
         semaphore = asyncio.Semaphore(max_concurrent)
